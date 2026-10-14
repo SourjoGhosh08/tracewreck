@@ -2,31 +2,33 @@ export type TraceEventStatus = "completed" | "failed" | "skipped";
 export type TraceEventType = "input" | "thought" | "tool_call" | "tool_result" | "output" | "error";
 export type AgentRunStatus = "success" | "suspicious" | "failed";
 
-export interface TraceEvent {
+export interface RunError {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+/** A normalized trace step returned by GET /api/runs/:id. */
+export interface TraceStep {
   id: string;
-  runId?: string;
-  stepIndex?: number;
+  runId: string;
+  stepIndex: number;
   type: TraceEventType;
   name: string;
   status: TraceEventStatus;
   startedAt: string;
-  completedAt: string;
+  completedAt: string | null;
   durationMs: number;
   input?: unknown;
   output?: unknown;
-  tool?: string;
-  error?: {
-    code: string;
-    message: string;
-    retryable: boolean;
-  };
-  isFirstFaultyStep?: boolean;
-}
-
-export interface TraceStep extends TraceEvent {
-  runId: string;
-  stepIndex: number;
+  tool?: string | null;
+  error?: RunError | null;
   isFirstFaultyStep: boolean;
+  is_first_faulty_step?: boolean;
+  riskScore?: number | null;
+  risk_score?: number | null;
+  tokenUsage?: number | { input?: number; output?: number; total?: number } | null;
+  token_usage?: number | { input?: number; output?: number; total?: number } | null;
 }
 
 export interface RunTrace {
@@ -38,7 +40,7 @@ export interface RunTrace {
   };
   status: AgentRunStatus;
   startedAt: string;
-  completedAt: string;
+  completedAt: string | null;
   events: TraceStep[];
   summary: {
     totalSteps: number;
@@ -49,7 +51,7 @@ export interface RunTrace {
   };
 }
 
-export interface AgentRunRecord {
+export interface RunListRecord {
   id: string;
   agentName: string;
   agentVersion: string;
@@ -60,43 +62,23 @@ export interface AgentRunRecord {
   durationMs: number;
   model: string;
   environment: Record<string, string>;
-  input: unknown;
-  output: unknown;
-  error: {
-    code: string;
-    message: string;
-    retryable: boolean;
-  } | null;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
   costUsd: number;
   createdAt: string;
-  trace: RunTrace;
-  steps: TraceStep[];
+  stepCount: number;
+  firstFaultyStep: string | null;
+  errorCode: string | null;
+  /** Enriched from the detail endpoint for the dashboard table. */
+  steps?: TraceStep[];
+  taskSummary?: string;
 }
 
-export interface RunRecord {
-  id: string;
-  agentName: string;
-  agentVersion: string;
-  status: "completed" | "failed";
-  startedAt: string;
-  completedAt: string | null;
-  durationMs: number;
-  model: string;
-  environment: Record<string, string>;
+export interface RunRecord extends RunListRecord {
   input: unknown;
   output: unknown;
-  error: {
-    code: string;
-    message: string;
-    retryable: boolean;
-  } | null;
+  error: RunError | null;
   trace: RunTrace;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  costUsd: number;
-  createdAt: string;
+  steps: TraceStep[];
 }

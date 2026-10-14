@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AgentPostmortem — Agent run observability",
-  description: "Inspect AI-agent runs, execution traces, and root causes."
+  description: "Flight recorder and root-cause debugger for AI agents"
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
