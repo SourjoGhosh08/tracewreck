@@ -27,47 +27,64 @@ function createDb(): Db {
   sqlite.pragma("foreign_keys = ON");
   globalThis.__agentPostmortemSqlite = sqlite;
 
-  // Replace the Phase 1 prototype's JSON-in-runs table when an existing local
-  // database is opened. The normalized tables are the sole source of truth.
-  const oldRuns = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'runs'").get();
-  if (oldRuns) sqlite.exec("DROP TABLE runs");
+  // Replace the prototype schema when an existing local database is opened.
+  // This keeps a checkout with an older ignored SQLite file reproducible while
+  // preserving data for databases that already have the current contract.
+  const requiredRunColumns = [
+    "id", "agent_name", "agent_version", "model", "task_summary", "user_request",
+    "status", "final_outcome", "failure_class", "started_at", "ended_at", "duration_ms",
+    "total_tokens_in", "total_tokens_out", "llm_calls", "tool_calls", "created_at"
+  ];
+  const requiredStepColumns = [
+    "id", "run_id", "step_id", "parent_step_id", "type", "title", "started_at", "ended_at",
+    "input_json", "output_json", "tokens_in", "tokens_out", "latency_ms", "status", "risk_score",
+    "notes", "is_first_faulty_step"
+  ];
+  const columnsFor = (table: string) => new Set(
+    (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((column) => column.name)
+  );
+  const currentSchema = requiredRunColumns.every((column) => columnsFor("agent_runs").has(column)) &&
+    requiredStepColumns.every((column) => columnsFor("trace_steps").has(column));
+  if (!currentSchema) sqlite.exec("DROP TABLE IF EXISTS trace_steps; DROP TABLE IF EXISTS agent_runs; DROP TABLE IF EXISTS runs;");
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS agent_runs (
       id TEXT PRIMARY KEY NOT NULL,
       agent_name TEXT NOT NULL,
       agent_version TEXT NOT NULL,
+      model TEXT NOT NULL,
+      task_summary TEXT NOT NULL,
+      user_request TEXT NOT NULL,
       status TEXT NOT NULL CHECK (status IN ('success', 'suspicious', 'failed')),
+      final_outcome TEXT NOT NULL,
       failure_class TEXT,
       started_at TEXT NOT NULL,
-      completed_at TEXT,
+      ended_at TEXT NOT NULL,
       duration_ms INTEGER NOT NULL,
-      model TEXT NOT NULL,
-      environment TEXT NOT NULL,
-      input TEXT NOT NULL,
-      output TEXT,
-      error TEXT,
-      prompt_tokens INTEGER NOT NULL,
-      completion_tokens INTEGER NOT NULL,
-      total_tokens INTEGER NOT NULL,
-      cost_usd REAL NOT NULL,
+      total_tokens_in INTEGER NOT NULL,
+      total_tokens_out INTEGER NOT NULL,
+      llm_calls INTEGER NOT NULL,
+      tool_calls INTEGER NOT NULL,
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS trace_steps (
       id TEXT PRIMARY KEY NOT NULL,
       run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
-      step_index INTEGER NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('input', 'thought', 'tool_call', 'tool_result', 'output', 'error')),
-      name TEXT NOT NULL,
-      status TEXT NOT NULL CHECK (status IN ('completed', 'failed', 'skipped')),
+      step_id TEXT NOT NULL,
+      parent_step_id TEXT,
+      type TEXT NOT NULL CHECK (type IN ('user_request', 'agent_plan', 'model_call', 'retrieval', 'tool_call', 'tool_result', 'policy_check', 'human_approval', 'retry', 'error', 'final_response')),
+      title TEXT NOT NULL,
       started_at TEXT NOT NULL,
-      completed_at TEXT,
-      duration_ms INTEGER NOT NULL,
-      input TEXT,
-      output TEXT,
-      tool TEXT,
-      error TEXT,
+      ended_at TEXT NOT NULL,
+      input_json TEXT,
+      output_json TEXT,
+      tokens_in INTEGER NOT NULL DEFAULT 0,
+      tokens_out INTEGER NOT NULL DEFAULT 0,
+      latency_ms INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('ok', 'warning', 'error')),
+      risk_score REAL,
+      notes TEXT,
       is_first_faulty_step INTEGER NOT NULL DEFAULT 0 CHECK (is_first_faulty_step IN (0, 1)),
-      UNIQUE (run_id, step_index)
+      UNIQUE (run_id, step_id)
     );
   `);
   return drizzle(sqlite, { schema });

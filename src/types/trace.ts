@@ -1,5 +1,20 @@
-export type TraceEventStatus = "completed" | "failed" | "skipped";
-export type TraceEventType = "input" | "thought" | "tool_call" | "tool_result" | "output" | "error";
+export type TraceEventStatus = "ok" | "warning" | "error" | "completed" | "failed" | "skipped";
+export type TraceEventType =
+  | "user_request"
+  | "agent_plan"
+  | "model_call"
+  | "retrieval"
+  | "tool_call"
+  | "tool_result"
+  | "policy_check"
+  | "human_approval"
+  | "retry"
+  | "error"
+  | "final_response"
+  // Legacy aliases remain typed because the unchanged page supports old fixtures.
+  | "input"
+  | "thought"
+  | "output";
 export type AgentRunStatus = "success" | "suspicious" | "failed";
 
 export interface RunError {
@@ -10,67 +25,98 @@ export interface RunError {
 
 /** A normalized trace step returned by GET /api/runs/:id. */
 export interface TraceStep {
+  // Exact API contract.
+  step_id: string;
+  parent_step_id: string | null;
+  type: TraceEventType;
+  title: string;
+  started_at: string;
+  ended_at: string;
+  input: unknown;
+  output: unknown;
+  tokens_in: number;
+  tokens_out: number;
+  latency_ms: number;
+  status: TraceEventStatus;
+  risk_score: number | null;
+  notes: string | null;
+  is_first_faulty_step: boolean;
+
+  // Compatibility aliases consumed by the unchanged page.
   id: string;
   runId: string;
   stepIndex: number;
-  type: TraceEventType;
   name: string;
-  status: TraceEventStatus;
   startedAt: string;
   completedAt: string | null;
   durationMs: number;
-  input?: unknown;
-  output?: unknown;
   tool?: string | null;
   error?: RunError | null;
   isFirstFaultyStep: boolean;
-  is_first_faulty_step?: boolean;
   riskScore?: number | null;
-  risk_score?: number | null;
   tokenUsage?: number | { input?: number; output?: number; total?: number } | null;
   token_usage?: number | { input?: number; output?: number; total?: number } | null;
 }
 
 export interface RunTrace {
   version: 1;
-  runId: string;
-  agent: {
-    name: string;
-    version: string;
-  };
+  run_id: string;
+  agent: { name: string; version: string };
   status: AgentRunStatus;
-  startedAt: string;
-  completedAt: string | null;
+  started_at: string;
+  ended_at: string;
+  steps: TraceStep[];
   events: TraceStep[];
   summary: {
+    total_steps: number;
+    completed_steps: number;
+    failed_step: string | null;
+    first_faulty_step: string | null;
+    root_cause: string | null;
     totalSteps: number;
     completedSteps: number;
     failedStep: string | null;
-    firstFaultyStep?: string | null;
+    firstFaultyStep: string | null;
     rootCause: string | null;
   };
 }
 
 export interface RunListRecord {
   id: string;
+  agent_name: string;
+  agent_version: string;
+  model: string;
+  task_summary: string;
+  user_request: unknown;
+  status: AgentRunStatus;
+  final_outcome: unknown;
+  failure_class: string | null;
+  started_at: string;
+  ended_at: string;
+  duration_ms: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
+  llm_calls: number;
+  tool_calls: number;
+  created_at: string;
+  step_count: number;
+  first_faulty_step: string | null;
+  error_code: string | null;
+
+  // Compatibility aliases consumed by the unchanged dashboard.
   agentName: string;
   agentVersion: string;
-  status: AgentRunStatus;
   failureClass: string | null;
   startedAt: string;
   completedAt: string | null;
   durationMs: number;
-  model: string;
-  environment: Record<string, string>;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  costUsd: number;
   createdAt: string;
   stepCount: number;
   firstFaultyStep: string | null;
   errorCode: string | null;
-  /** Enriched from the detail endpoint for the dashboard table. */
   steps?: TraceStep[];
   taskSummary?: string;
 }
