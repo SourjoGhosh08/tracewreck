@@ -38,10 +38,9 @@ function formatFailureClass(value: string | null) {
 }
 
 function callCounts(run: RunListRecord) {
-  const steps = run.steps ?? [];
   return {
-    llm: steps.filter((step) => step.type === "thought").length,
-    tools: steps.filter((step) => step.type === "tool_call").length
+    llm: run.llm_calls,
+    tools: run.tool_calls
   };
 }
 

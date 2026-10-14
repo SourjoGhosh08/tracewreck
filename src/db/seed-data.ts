@@ -186,14 +186,15 @@ const supportRefundSteps: NewTraceStep[] = [
   makeStep(failedSupportRefundId, 8, "policy_check", "Apply damaged-item policy", "warning", addMs(failedSupportRefundStartedAt, 426), 164, {
     input: { orderNumber: "847219", condition: "damaged" },
     output: {
-      policy: "returns-policy-v3",
-      decision: "replacement_or_full_refund",
-      correct_behavior_recommendation: "Ask the customer to confirm the damaged order, then offer replacement or a full $89.99 refund for order 847291."
+      policy: "returns-policy-v3 / 30-day discretionary return",
+      decision: "partial_refund",
+      correct_policy: "damaged-item replacement-or-full-refund policy",
+      correct_behavior_recommendation: "Ask the customer to confirm the damaged order, then apply the damaged-item policy and offer replacement or a full $89.99 refund for order 847291."
     },
     tokensIn: 182,
     tokensOut: 52,
     riskScore: 0.94,
-    notes: "Policy result identifies the correct behavior, but the selected order is already wrong."
+    notes: "WRONG_REFUND_POLICY: Read the discretionary return policy instead of the damaged-item policy for the selected order."
   }),
   makeStep(failedSupportRefundId, 9, "tool_call", "Issue incorrect refund", "error", addMs(failedSupportRefundStartedAt, 590), 18, {
     input: { tool: "payments.createRefund", orderNumber: "847219", amount: 12, currency: "USD", reason: "damaged_item" },
@@ -218,6 +219,7 @@ const supportRefundSteps: NewTraceStep[] = [
         "Ask the customer to confirm which of the two similar orders contains the damaged headphones.",
         "Select order 847291 only after confirmation.",
         "Apply the damaged-item policy and offer replacement or a full $89.99 refund.",
+        "Require human approval before issuing a high-value refund.",
         "Send confirmation only after the correct refund succeeds."
       ]
     },
