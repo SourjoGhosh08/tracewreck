@@ -1,6 +1,6 @@
 # AgentPostmortem Phase 1
 
-Backend foundation for inspecting AI-agent runs and their structured execution traces. Phase 1 includes a Next.js 14 / TypeScript application foundation, a local Drizzle SQLite database, deterministic fixtures, and read/seed API routes. UI pages and LLM integrations are intentionally not included.
+Backend foundation for inspecting AI-agent runs and their structured execution traces. Phase 1 uses Next.js 14, TypeScript, Drizzle, and SQLite with normalized `agent_runs` and `trace_steps` tables.
 
 ## Requirements
 
@@ -28,9 +28,9 @@ The API is available at `http://localhost:3000/api/runs`.
 
 ## API
 
-- `GET /api/runs` returns all eight seeded runs, newest first.
-- `GET /api/runs/:id` returns one run, including its exact structured `trace` JSON, or a 404 for an unknown id.
-- `POST /api/seed` resets and inserts the deterministic eight-run fixture set. `POST /api/runs` is also supported as an equivalent convenience endpoint.
+- `GET /api/runs` returns all eight seeded run summaries, newest first. Optional filters are `status` (`success`, `suspicious`, or `failed`), `agent`/`agentName`, and `failureClass`.
+- `GET /api/runs/:id` returns one run with its normalized steps and a structured `run.trace.events` trace, or a 404 for an unknown id. Trace events include `stepIndex`, `type`, `status`, payloads, errors, and `isFirstFaultyStep`.
+- `POST /api/seed` resets both tables and inserts exactly eight deterministic fixtures: four `success`, two `suspicious`, and two `failed` runs. `POST /api/runs` remains an equivalent convenience endpoint.
 
 ## Checks
 
