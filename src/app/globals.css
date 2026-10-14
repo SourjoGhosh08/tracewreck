@@ -8,4 +8,21 @@
     --foreground: 210 40% 98%;
     --border: 217 33% 20%;
   }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    background: #080b12;
+  }
+
+  body {
+    @apply bg-[#080b12] text-foreground antialiased;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    @apply bg-violet-500/30 text-violet-100;
+  }
 }

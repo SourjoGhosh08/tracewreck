@@ -37,3 +37,28 @@ export interface RunTrace {
     rootCause: string | null;
   };
 }
+
+export interface RunRecord {
+  id: string;
+  agentName: string;
+  agentVersion: string;
+  status: "completed" | "failed";
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number;
+  model: string;
+  environment: Record<string, string>;
+  input: unknown;
+  output: unknown;
+  error: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  } | null;
+  trace: RunTrace;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  createdAt: string;
+}
