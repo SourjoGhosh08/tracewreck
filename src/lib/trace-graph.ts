@@ -9,11 +9,27 @@ export interface TraceGraphNodeData {
   order: number;
 }
 
+export type TraceGraphHandlePosition = "left" | "right" | "top" | "bottom";
+export type TraceGraphRowDirection = "ltr" | "rtl";
+
+export interface TraceGraphLayoutItem {
+  id: string;
+  x: number;
+  y: number;
+  order: number;
+  row: number;
+  column: number;
+  rowDirection: TraceGraphRowDirection;
+  sourcePosition: TraceGraphHandlePosition;
+  targetPosition: TraceGraphHandlePosition;
+}
+
 export interface TraceGraphNode {
   id: string;
   type: "trace-step";
   data: TraceGraphNodeData;
   position: { x: number; y: number };
+  layout: TraceGraphLayoutItem;
 }
 
 export type TraceGraphEdgeKind = "recorded" | "inferred";
@@ -61,17 +77,10 @@ export interface TraceGraphDiagnostics {
   fixtureAnnotations: FixtureAnnotationReport;
 }
 
-export interface TraceGraphLayoutItem {
-  id: string;
-  x: number;
-  y: number;
-  order: number;
-}
-
 export interface TraceGraph {
   nodes: TraceGraphNode[];
   edges: TraceGraphEdge[];
-  /** Deterministic top-to-bottom positions, suitable for a graph renderer. */
+  /** Deterministic wrapped positions, suitable for an orthogonal graph renderer. */
   layout: TraceGraphLayoutItem[];
   diagnostics: TraceGraphDiagnostics;
   /** Reachability follows edge source -> target (parent -> child). */
@@ -81,8 +90,12 @@ export interface TraceGraph {
 export interface TraceGraphOptions {
   /** Add adjacent execution-order edges that are not already recorded. */
   inferExecutionOrder?: boolean;
-  /** Vertical distance between nodes in the renderer-independent layout input. */
+  /** Distance between wrapped rows in the renderer-independent layout input. */
   rowSpacing?: number;
+  /** Horizontal distance between wrapped columns in the renderer-independent layout input. */
+  columnSpacing?: number;
+  /** Number of nodes per row before the layout wraps and reverses direction. */
+  columns?: number;
 }
 
 interface IndexedStep {
@@ -91,7 +104,9 @@ interface IndexedStep {
   nodeId: string;
 }
 
-const DEFAULT_ROW_SPACING = 120;
+const DEFAULT_ROW_SPACING = 170;
+const DEFAULT_COLUMN_SPACING = 285;
+const DEFAULT_COLUMNS = 6;
 
 function compareSteps(left: IndexedStep, right: IndexedStep): number {
   const leftStarted = typeof left.step.started_at === "string" ? left.step.started_at : "";
@@ -187,17 +202,52 @@ export function buildTraceGraph(steps: readonly TraceStep[], options: TraceGraph
     occurrences.set(indexed.step.step_id, occurrence + 1);
   }
 
-  const nodes = orderedSteps.map(({ step, nodeId }, order) => ({
-    id: nodeId,
-    type: "trace-step" as const,
-    data: {
-      step: { ...step },
-      step_id: step.step_id,
-      originalStepId: step.step_id,
-      order
-    },
-    position: { x: 0, y: order * (options.rowSpacing ?? DEFAULT_ROW_SPACING) }
-  }));
+  const columnCount = Math.min(
+    Math.max(1, Math.floor(options.columns ?? DEFAULT_COLUMNS)),
+    Math.max(1, orderedSteps.length)
+  );
+  const rowSpacing = options.rowSpacing ?? DEFAULT_ROW_SPACING;
+  const columnSpacing = options.columnSpacing ?? DEFAULT_COLUMN_SPACING;
+  const layoutFor = (nodeId: string, order: number): TraceGraphLayoutItem => {
+    const row = Math.floor(order / columnCount);
+    const offset = order % columnCount;
+    const rowLength = Math.min(columnCount, orderedSteps.length - row * columnCount);
+    const rowDirection: TraceGraphRowDirection = row % 2 === 0 ? "ltr" : "rtl";
+    const column = rowDirection === "ltr" ? offset : columnCount - 1 - offset;
+    const isRowStart = offset === 0;
+    const isRowEnd = offset === rowLength - 1;
+    return {
+      id: nodeId,
+      x: column * columnSpacing,
+      y: row * rowSpacing,
+      order,
+      row,
+      column,
+      rowDirection,
+      sourcePosition: isRowEnd && order < orderedSteps.length - 1
+        ? "bottom"
+        : rowDirection === "ltr" ? "right" : "left",
+      targetPosition: isRowStart && order > 0
+        ? "top"
+        : rowDirection === "ltr" ? "left" : "right"
+    };
+  };
+
+  const nodes = orderedSteps.map(({ step, nodeId }, order) => {
+    const layout = layoutFor(nodeId, order);
+    return {
+      id: nodeId,
+      type: "trace-step" as const,
+      data: {
+        step: { ...step },
+        step_id: step.step_id,
+        originalStepId: step.step_id,
+        order
+      },
+      position: { x: layout.x, y: layout.y },
+      layout
+    };
+  });
 
   const byStepId = new Map<string, IndexedStep[]>();
   for (const indexed of orderedSteps) {
@@ -292,7 +342,7 @@ export function buildTraceGraph(steps: readonly TraceStep[], options: TraceGraph
     }));
   }
 
-  const layout = nodes.map((node) => ({ id: node.id, x: node.position.x, y: node.position.y, order: node.data.order }));
+  const layout = nodes.map((node) => node.layout);
   const downstreamByNodeId = Object.fromEntries(nodes.map((node) => [node.id, sortedReachableNodeIds(node.id, nodes, edges)]));
 
   return {

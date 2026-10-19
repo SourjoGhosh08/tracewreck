@@ -38,7 +38,11 @@ test("creates one stable node per step, preserves IDs, and lays out deterministi
   ]);
   assert.equal(graph.nodes.length, 2);
   assert.deepEqual(graph.nodes.map((node) => node.data.step_id), ["root", "child"]);
-  assert.deepEqual(graph.nodes.map((node) => node.position.y), [0, 120]);
+  assert.deepEqual(graph.nodes.map((node) => node.position), [{ x: 0, y: 0 }, { x: 285, y: 0 }]);
+  assert.deepEqual(graph.nodes.map((node) => [node.layout.row, node.layout.column, node.layout.rowDirection]), [
+    [0, 0, "ltr"],
+    [0, 1, "ltr"]
+  ]);
   assert.equal(graph.edges.length, 1);
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
   for (const edge of graph.edges) {
@@ -49,6 +53,31 @@ test("creates one stable node per step, preserves IDs, and lays out deterministi
   assert.equal(graph.edges[0].target, graph.nodes[1].id);
   assert.equal(graph.edges[0].kind, "recorded");
   assert.equal(graph.edges[0].inferred, false);
+});
+
+test("wraps twelve steps into two alternating horizontal rows with short row-boundary handles", () => {
+  const graph = buildTraceGraph(Array.from({ length: 12 }, (_, index) => step(
+    `step-${index + 1}`,
+    `2024-01-01T00:00:${String(index + 1).padStart(2, "0")}Z`,
+    index === 0 ? null : `step-${index}`
+  )), { inferExecutionOrder: true });
+
+  assert.deepEqual(graph.layout.map(({ x, y }) => [x, y]), [
+    [0, 0], [285, 0], [570, 0], [855, 0], [1140, 0], [1425, 0],
+    [1425, 170], [1140, 170], [855, 170], [570, 170], [285, 170], [0, 170]
+  ]);
+  assert.deepEqual(graph.layout.map(({ row, column, rowDirection }) => [row, column, rowDirection]), [
+    [0, 0, "ltr"], [0, 1, "ltr"], [0, 2, "ltr"], [0, 3, "ltr"], [0, 4, "ltr"], [0, 5, "ltr"],
+    [1, 5, "rtl"], [1, 4, "rtl"], [1, 3, "rtl"], [1, 2, "rtl"], [1, 1, "rtl"], [1, 0, "rtl"]
+  ]);
+  assert.deepEqual(graph.layout.map(({ sourcePosition, targetPosition }) => [sourcePosition, targetPosition]), [
+    ["right", "left"], ["right", "left"], ["right", "left"], ["right", "left"], ["right", "left"], ["bottom", "left"],
+    ["left", "top"], ["left", "right"], ["left", "right"], ["left", "right"], ["left", "right"], ["left", "right"]
+  ]);
+  assert.equal(new Set(graph.layout.map((item) => item.row)).size, 2);
+  assert.equal(graph.edges.length, 11);
+  assert.equal(graph.edges.filter((edge) => edge.kind === "recorded").length, 11);
+  assert.equal(graph.edges.filter((edge) => edge.kind === "inferred").length, 0);
 });
 
 test("adds only adjacent inferred execution-order edges and marks them", () => {

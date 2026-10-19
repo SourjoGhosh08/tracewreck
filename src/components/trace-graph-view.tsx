@@ -22,7 +22,7 @@ import { JsonViewer } from "@/components/json-viewer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { downstreamNodeIds, type TraceGraph, type TraceGraphEdge, type TraceGraphNodeData } from "@/lib/trace-graph";
+import { downstreamNodeIds, type TraceGraph, type TraceGraphEdge, type TraceGraphHandlePosition, type TraceGraphNodeData } from "@/lib/trace-graph";
 import type { TraceStep } from "@/types/trace";
 import { cn, formatDuration } from "@/lib/utils";
 
@@ -33,6 +33,8 @@ type FlowTraceNodeData = TraceGraphNodeData & {
   dimmed: boolean;
   onSelect: () => void;
   onViewTimeline: () => void;
+  sourcePosition: TraceGraphHandlePosition;
+  targetPosition: TraceGraphHandlePosition;
 };
 
 type FlowTraceNode = Node<FlowTraceNodeData, "trace-step">;
@@ -126,7 +128,7 @@ function TraceStepNode({ data }: NodeProps<FlowTraceNode>) {
       data.dimmed && "opacity-30"
     )}
   >
-    <Handle type="target" position={Position.Top} className="!h-2 !w-2 !border-0 !bg-violet-300" />
+    <Handle type="target" position={flowPosition(data.targetPosition)} id="target" className="!h-2 !w-2 !border-0 !bg-violet-300" />
     <div className="flex items-start gap-2">
       <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border", tone)}><StepIcon step={data.step} /></span>
       <div className="min-w-0 flex-1">
@@ -143,8 +145,17 @@ function TraceStepNode({ data }: NodeProps<FlowTraceNode>) {
       {tool ? <span className="flex min-w-0 items-center gap-1 truncate text-orange-300/80" title={tool}><Wrench size={10} />{tool}</span> : <span />}
       <span className="flex shrink-0 items-center gap-1 font-mono"><Clock3 size={10} />{formatDuration(data.step.durationMs)}</span>
     </div>
-    <Handle type="source" position={Position.Bottom} className="!h-2 !w-2 !border-0 !bg-violet-300" />
+    <Handle type="source" position={flowPosition(data.sourcePosition)} id="source" className="!h-2 !w-2 !border-0 !bg-violet-300" />
   </div>;
+}
+
+function flowPosition(position: TraceGraphHandlePosition): Position {
+  return {
+    left: Position.Left,
+    right: Position.Right,
+    top: Position.Top,
+    bottom: Position.Bottom
+  }[position];
 }
 
 const nodeTypes = { "trace-step": TraceStepNode };
@@ -188,8 +199,12 @@ function FlowCanvas({ graph, selectedNodeId, highlightNodeIds, showInferred, onS
     id: node.id,
     type: "trace-step",
     position: node.position,
+    sourcePosition: flowPosition(node.layout.sourcePosition),
+    targetPosition: flowPosition(node.layout.targetPosition),
     data: {
       ...node.data,
+      sourcePosition: node.layout.sourcePosition,
+      targetPosition: node.layout.targetPosition,
       selected: node.id === selectedNodeId,
       highlighted: highlightNodeIds.has(node.id),
       dimmed: hasHighlight && !highlightNodeIds.has(node.id),
@@ -204,6 +219,8 @@ function FlowCanvas({ graph, selectedNodeId, highlightNodeIds, showInferred, onS
       source: edge.source,
       target: edge.target,
       type: "smoothstep",
+      sourceHandle: "source",
+      targetHandle: "target",
       data: { kind: edge.kind },
       markerEnd: { type: MarkerType.ArrowClosed, color: edge.kind === "recorded" ? "#a78bfa" : "#64748b" },
       style: edgeStyle(edge, highlighted, hasHighlight && !highlighted),
@@ -214,7 +231,7 @@ function FlowCanvas({ graph, selectedNodeId, highlightNodeIds, showInferred, onS
     };
   }), [hasHighlight, highlightNodeIds, visibleEdgeIds, visibleEdges]);
 
-  return <div className="relative h-[620px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#080b12]" data-testid="trace-graph-canvas">
+  return <div className="relative h-[620px] overflow-hidden rounded-xl border border-white/[0.08] bg-[#080b12]" data-layout="orthogonal-wrapped" data-testid="trace-graph-canvas">
     <FlowToolbar onFit={() => flow.fitView({ padding: 0.18, duration: 180 })} onReset={() => flow.setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 180 })} showInferred={showInferred} onToggleInferred={onToggleInferred} />
     <ReactFlow
       nodes={nodes}
@@ -270,12 +287,12 @@ export function TraceGraphView({ graph, selectedNodeId, onSelectNode, onViewTime
 
   const annotationCount = graph.diagnostics.fixtureAnnotations.count;
   return <div className="space-y-4">
-    <div className="rounded-lg border border-blue-400/15 bg-blue-400/[0.04] p-3 text-xs leading-5 text-blue-100/75"><p className="flex items-center gap-2 font-semibold text-blue-200"><Info size={14} /> Recorded execution graph</p><p className="mt-1">This graph shows recorded trace steps and parent relationships. It does not reveal hidden model reasoning, prove causation, or predict a corrected outcome.</p></div>
+    <div className="rounded-lg border border-blue-400/15 bg-blue-400/[0.04] p-3 text-xs leading-5 text-blue-100/75"><p className="flex items-center gap-2 font-semibold text-blue-200"><Info size={14} /> Wrapped execution graph</p><p className="mt-1">Recorded steps flow left-to-right, wrap downward, and reverse direction on the next row so execution-order connectors stay short and orthogonal. Parent relationships remain recorded evidence; this graph does not reveal hidden model reasoning, prove causation, or predict a corrected outcome.</p></div>
     {graph.diagnostics.warnings.length > 0 ? <div className="rounded-lg border border-yellow-400/20 bg-yellow-400/[0.05] p-3 text-xs text-yellow-100/80"><p className="flex items-center gap-2 font-semibold text-yellow-200"><AlertTriangle size={14} /> Data-quality warnings</p><ul className="mt-1 list-inside list-disc space-y-1">{graph.diagnostics.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}>{warning.message}</li>)}</ul></div> : null}
     {annotationCount > 0 ? <div className="rounded-lg border border-red-400/15 bg-red-400/[0.04] p-3 text-xs text-red-100/75"><p className="flex items-center gap-2 font-semibold text-red-200"><AlertTriangle size={14} /> Demo fixture annotation{annotationCount === 1 ? "" : "s"}</p><p className="mt-1">{annotationCount === 1 ? "One step" : `${annotationCount} steps`} is marked by synthetic fixture data. This is not live AI diagnosis.</p></div> : null}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
-      <div className="min-w-0 space-y-3"><GraphErrorBoundary><ReactFlowProvider><FlowCanvas graph={graph} selectedNodeId={selectedNodeId} highlightNodeIds={downstream} showInferred={showInferred} onSelectNode={selectNode} onViewTimeline={onViewTimeline} onToggleInferred={() => setShowInferred((current) => !current)} /></ReactFlowProvider></GraphErrorBoundary><RelationshipLegend showInferred={showInferred} /><p className="text-[10px] leading-5 text-slate-500">Use the controls to pan, zoom, fit, or reset the view. Select a node with the mouse or keyboard. Inferred order edges are dashed and can be hidden.</p></div>
-      <Inspector node={selectedGraphNode ? { id: selectedGraphNode.id, type: "trace-step", position: selectedGraphNode.position, data: { ...selectedGraphNode.data, selected: selectedGraphNode.id === selectedNodeId, highlighted: downstream.has(selectedGraphNode.id), dimmed: false, onSelect: () => selectNode(selectedGraphNode.id), onViewTimeline: () => onViewTimeline(selectedGraphNode.id) } } : null} graph={graph} onViewTimeline={onViewTimeline} onClear={() => selectNode(null)} onHighlight={toggleHighlight} hasHighlight={highlightDownstream} />
+      <div className="min-w-0 space-y-3"><GraphErrorBoundary><ReactFlowProvider><FlowCanvas graph={graph} selectedNodeId={selectedNodeId} highlightNodeIds={downstream} showInferred={showInferred} onSelectNode={selectNode} onViewTimeline={onViewTimeline} onToggleInferred={() => setShowInferred((current) => !current)} /></ReactFlowProvider></GraphErrorBoundary><RelationshipLegend showInferred={showInferred} /><p className="text-[10px] leading-5 text-slate-500">The wrapped layout reads horizontally, then down, then horizontally back across the next row. Use the controls to pan, zoom, fit, or reset the view; select a node with the mouse or keyboard. Inferred order edges are dashed and can be hidden.</p></div>
+      <Inspector node={selectedGraphNode ? { id: selectedGraphNode.id, type: "trace-step", position: selectedGraphNode.position, data: { ...selectedGraphNode.data, sourcePosition: selectedGraphNode.layout.sourcePosition, targetPosition: selectedGraphNode.layout.targetPosition, selected: selectedGraphNode.id === selectedNodeId, highlighted: downstream.has(selectedGraphNode.id), dimmed: false, onSelect: () => selectNode(selectedGraphNode.id), onViewTimeline: () => onViewTimeline(selectedGraphNode.id) } } : null} graph={graph} onViewTimeline={onViewTimeline} onClear={() => selectNode(null)} onHighlight={toggleHighlight} hasHighlight={highlightDownstream} />
     </div>
   </div>;
 }
