@@ -12,7 +12,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="hidden text-sm font-semibold tracking-tight text-slate-100 sm:block">TraceWreck</span>
             </Link>
             <nav className="hidden items-center gap-1 md:flex">
-              <Link href="/" className="rounded-md bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-slate-100">Runs</Link>
+              <Link href="/app" className="rounded-md bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-slate-100">Runs</Link>
               <button type="button" className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-300"><Activity size={14} /> Agents <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-slate-500">Soon</span></button>
             </nav>
           </div>

@@ -166,10 +166,10 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
   };
 
   if (loading) return <AppShell><div className="space-y-6" role="status" aria-label="Loading run"><Skeleton className="h-5 w-24" /><Skeleton className="h-52 w-full" /><Skeleton className="h-9 w-full" /><Skeleton className="h-[420px]" /></div></AppShell>;
-  if (error || !run) return <AppShell><EmptyState title="Run unavailable" description={error ?? "This run does not exist."} action={<div className="flex gap-2"><Link href="/" className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 px-3 text-xs text-slate-300"><ArrowLeft size={14} /> Back to runs</Link><Button onClick={() => void loadRun()}><RefreshCw size={14} /> Try again</Button></div>} /></AppShell>;
+  if (error || !run) return <AppShell><EmptyState title="Run unavailable" description={error ?? "This run does not exist."} action={<div className="flex gap-2"><Link href="/app" className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 px-3 text-xs text-slate-300"><ArrowLeft size={14} /> Back to runs</Link><Button onClick={() => void loadRun()}><RefreshCw size={14} /> Try again</Button></div>} /></AppShell>;
 
   return <AppShell><div className="space-y-6">
-    <div className="flex items-center justify-between gap-4"><Link href="/" className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-200"><ArrowLeft size={14} /> Back to all runs</Link><Button variant="ghost" size="sm" onClick={() => void loadRun()}><RefreshCw size={14} /> Refresh</Button></div>
+    <div className="flex items-center justify-between gap-4"><Link href="/app" className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-200"><ArrowLeft size={14} /> Back to all runs</Link><Button variant="ghost" size="sm" onClick={() => void loadRun()}><RefreshCw size={14} /> Refresh</Button></div>
     <Card className="overflow-hidden">
       <div className="border-b border-white/[0.07] bg-gradient-to-r from-violet-500/[0.08] via-transparent to-transparent p-6 sm:p-7">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
