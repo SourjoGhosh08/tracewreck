@@ -14,6 +14,7 @@ import {
   ScanSearch,
   ShieldCheck,
   Terminal,
+  Upload,
   Workflow,
   X
 } from "lucide-react";
@@ -95,8 +96,9 @@ export default function LandingPage() {
               <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-300/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-violet-200"><CircleDot size={12} className="text-violet-300" /> Flight recorder for AI agents</div>
               <h1 className="max-w-3xl text-5xl font-semibold leading-[1.04] tracking-[-0.045em] text-slate-50 sm:text-6xl lg:text-[4.7rem]">Debug the path.<br /><span className="text-slate-500">Not just the output.</span></h1>
               <p className="mt-7 max-w-xl text-base leading-7 text-slate-400 sm:text-lg">TraceWreck makes agent failures inspectable. See what your agent observed, decided, and did—then separate recorded facts from the story you think explains them.</p>
-              <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-               <Link href="/app" className="inline-flex h-11 items-center gap-2 rounded-md bg-violet-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/80">Explore recorded runs <ArrowRight size={16} /></Link>
+              <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <Link href="/app" className="inline-flex h-11 items-center gap-2 rounded-md bg-violet-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/80">Explore recorded runs <ArrowRight size={16} /></Link>
+                <Link href="/app/import" className="inline-flex h-11 items-center gap-2 rounded-md border border-sky-300/25 bg-sky-300/[0.06] px-5 text-sm font-medium text-sky-100 transition-colors hover:border-sky-200/45 hover:bg-sky-300/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"><Upload size={15} className="text-sky-300" /> Import your own trace</Link>
                 <Link href={failedDemoHref} className="inline-flex h-11 items-center gap-2 rounded-md border border-white/10 px-5 text-sm font-medium text-slate-300 transition-colors hover:border-red-300/35 hover:bg-red-400/[0.06] hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"><Play size={15} className="text-red-300" /> Inspect a failed run</Link>
               </div>
                <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[11px] text-slate-600"><span className="flex items-center gap-2"><Check size={13} className="text-emerald-400" /> Ordered execution traces</span><span className="flex items-center gap-2"><Check size={13} className="text-emerald-400" /> Evidence-first reviews</span><span className="flex items-center gap-2"><Check size={13} className="text-emerald-400" /> Local counterfactuals</span></div>
