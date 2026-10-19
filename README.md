@@ -2,6 +2,8 @@
 
 **The flight recorder and root-cause debugger for AI agents.**
 
+Trace AI-agent failures, inspect decision paths, and simulate fixes
+
 TraceWreck helps developers trace AI-agent failures, inspect decision paths, and review evidence-linked diagnosis hypotheses. The current implementation spans recorded-trace inspection (Phases 1–3) and a deterministic, read-only Phase 4 counterfactual simulation. Phase 5 records verification evidence and limits; it does not turn simulations into live enforcement or claim that a failure was prevented.
 
 ## Phase 1 scope
