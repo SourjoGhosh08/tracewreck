@@ -1,6 +1,15 @@
-node_modules
-.next
-.git
-data/*.db*
-.env*
+node_modules/
+.next/
+.git/
+.gitignore
+data/
+coverage/
+
+# Never send local secrets to the build context; retain the example template.
+.env
+.env.*
+!.env.example
+
+*.log
+*.tsbuildinfo
 README.md

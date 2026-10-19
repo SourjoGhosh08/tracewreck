@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/db/client";
 import { agentRuns, runStatuses, traceSteps } from "@/db/schema";
 import { runSummary } from "@/db/trace";
-import { seedDatabase } from "@/db/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -28,9 +27,4 @@ export async function GET(request: Request) {
   const stepsByRun = new Map<string, typeof steps>();
   for (const step of steps) stepsByRun.set(step.runId, [...(stepsByRun.get(step.runId) ?? []), step]);
   return NextResponse.json({ runs: records.map((run) => runSummary(run, stepsByRun.get(run.id) ?? [])) });
-}
-
-export async function POST() {
-  const records = seedDatabase();
-  return NextResponse.json({ seeded: records.length, runIds: records.map((run) => run.id) }, { status: 201 });
 }

@@ -1,22 +1,32 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import * as schema from "./schema";
 
 type Db = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
-  // eslint-disable-next-line no-var
   var __agentPostmortemDb: Db | undefined;
-  // eslint-disable-next-line no-var
   var __agentPostmortemSqlite: Database.Database | undefined;
 }
 
 function databaseFile(): string {
-  const configured = process.env.DATABASE_URL ?? "file:./data/agentpostmortem.db";
+  const configured = process.env.DATABASE_URL ?? localDatabaseUrl() ?? "file:./data/agentpostmortem.db";
   if (configured === ":memory:") return configured;
   return configured.startsWith("file:") ? resolve(process.cwd(), configured.slice(5)) : resolve(process.cwd(), configured);
+}
+
+function localDatabaseUrl(): string | undefined {
+  for (const filename of [".env.local", ".env"]) {
+    const path = resolve(process.cwd(), filename);
+    if (!existsSync(path)) continue;
+    const line = readFileSync(path, "utf8").split(/\r?\n/).find((entry) => /^\s*DATABASE_URL\s*=/.test(entry));
+    if (!line) continue;
+    const value = line.replace(/^\s*DATABASE_URL\s*=\s*/, "").trim().replace(/^(['"])(.*)\1$/, "$2");
+    if (value) return value;
+  }
+  return undefined;
 }
 
 function createDb(): Db {
@@ -27,25 +37,9 @@ function createDb(): Db {
   sqlite.pragma("foreign_keys = ON");
   globalThis.__agentPostmortemSqlite = sqlite;
 
-  // Replace the prototype schema when an existing local database is opened.
-  // This keeps a checkout with an older ignored SQLite file reproducible while
-  // preserving data for databases that already have the current contract.
-  const requiredRunColumns = [
-    "id", "agent_name", "agent_version", "model", "task_summary", "user_request",
-    "status", "final_outcome", "failure_class", "started_at", "ended_at", "duration_ms",
-    "total_tokens_in", "total_tokens_out", "llm_calls", "tool_calls", "created_at"
-  ];
-  const requiredStepColumns = [
-    "id", "run_id", "step_id", "parent_step_id", "type", "title", "started_at", "ended_at",
-    "input_json", "output_json", "tokens_in", "tokens_out", "latency_ms", "status", "risk_score",
-    "notes", "is_first_faulty_step"
-  ];
-  const columnsFor = (table: string) => new Set(
-    (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((column) => column.name)
-  );
-  const currentSchema = requiredRunColumns.every((column) => columnsFor("agent_runs").has(column)) &&
-    requiredStepColumns.every((column) => columnsFor("trace_steps").has(column));
-  if (!currentSchema) sqlite.exec("DROP TABLE IF EXISTS trace_steps; DROP TABLE IF EXISTS agent_runs; DROP TABLE IF EXISTS runs;");
+  // Startup is intentionally additive. Never drop or reset an existing
+  // database: this initializer creates missing tables, while the seed step
+  // separately decides whether the database is empty.
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS agent_runs (
       id TEXT PRIMARY KEY NOT NULL,
@@ -84,9 +78,48 @@ function createDb(): Db {
       risk_score REAL,
       notes TEXT,
       is_first_faulty_step INTEGER NOT NULL DEFAULT 0 CHECK (is_first_faulty_step IN (0, 1)),
-      UNIQUE (run_id, step_id)
+       UNIQUE (run_id, step_id)
     );
+    CREATE TABLE IF NOT EXISTS diagnosis_reports (
+      id TEXT PRIMARY KEY NOT NULL,
+      run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+      evidence_fingerprint TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+      report_json TEXT,
+      source TEXT NOT NULL DEFAULT 'live_model',
+      provider TEXT,
+      model TEXT,
+      prompt_version TEXT NOT NULL DEFAULT 'phase3-v1',
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      token_usage_json TEXT,
+      input_redacted INTEGER NOT NULL DEFAULT 0,
+      input_truncated INTEGER NOT NULL DEFAULT 0,
+      omitted_content_json TEXT,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      error_code TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (run_id, evidence_fingerprint)
+    );
+    CREATE INDEX IF NOT EXISTS diagnosis_reports_run_id_idx ON diagnosis_reports (run_id, updated_at);
   `);
+  // The diagnosis table is additive so a database created during an earlier
+  // Phase 3 build can be opened without dropping runs or trace steps.
+  const diagnosisColumns = sqlite.prepare("PRAGMA table_info(diagnosis_reports)").all() as Array<{ name: string }>;
+  const existingColumns = new Set(diagnosisColumns.map((column) => column.name));
+  const additions: Array<[string, string]> = [
+    ["source", "TEXT NOT NULL DEFAULT 'live_model'"],
+    ["provider", "TEXT"],
+    ["prompt_version", "TEXT NOT NULL DEFAULT 'phase3-v1'"],
+    ["schema_version", "INTEGER NOT NULL DEFAULT 1"],
+    ["token_usage_json", "TEXT"],
+    ["input_redacted", "INTEGER NOT NULL DEFAULT 0"],
+    ["input_truncated", "INTEGER NOT NULL DEFAULT 0"],
+    ["omitted_content_json", "TEXT"]
+  ];
+  for (const [column, definition] of additions) {
+    if (!existingColumns.has(column)) sqlite.exec(`ALTER TABLE diagnosis_reports ADD COLUMN ${column} ${definition}`);
+  }
   return drizzle(sqlite, { schema });
 }
 

@@ -108,8 +108,8 @@ export default function DashboardPage() {
       <section className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
           <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-violet-300"><Terminal size={14} /> Flight recorder</div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-100 sm:text-4xl">AgentPostmortem</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">Flight recorder and root-cause debugger for AI agents</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-100 sm:text-4xl">TraceWreck</h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">The flight recorder and root-cause debugger for AI agents.</p>
         </div>
         <Button variant="secondary" onClick={() => void loadRuns()} disabled={loading}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh data</Button>
       </section>

@@ -63,10 +63,37 @@ export const traceSteps = sqliteTable("trace_steps", {
   isFirstFaultyStep: integer("is_first_faulty_step", { mode: "boolean" }).notNull().default(false)
 });
 
+export const diagnosisStatuses = ["running", "completed", "failed"] as const;
+export type DiagnosisStatus = (typeof diagnosisStatuses)[number];
+
+/** A persisted, model-produced diagnosis. Fixture annotations are never stored here. */
+export const diagnosisReports = sqliteTable("diagnosis_reports", {
+  id: text("id").primaryKey(),
+  runId: text("run_id").notNull().references(() => agentRuns.id, { onDelete: "cascade" }),
+  evidenceFingerprint: text("evidence_fingerprint").notNull(),
+  status: text("status", { enum: diagnosisStatuses }).notNull(),
+  reportJson: text("report_json", { mode: "json" }).$type<unknown>(),
+  source: text("source").notNull().default("live_model"),
+  provider: text("provider"),
+  model: text("model"),
+  promptVersion: text("prompt_version").notNull().default("phase3-v1"),
+  schemaVersion: integer("schema_version").notNull().default(1),
+  tokenUsageJson: text("token_usage_json", { mode: "json" }).$type<unknown>(),
+  inputRedacted: integer("input_redacted", { mode: "boolean" }).notNull().default(false),
+  inputTruncated: integer("input_truncated", { mode: "boolean" }).notNull().default(false),
+  omittedContentJson: text("omitted_content_json", { mode: "json" }).$type<unknown>(),
+  attempts: integer("attempts").notNull().default(0),
+  errorCode: text("error_code"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;
 export type TraceStep = typeof traceSteps.$inferSelect;
 export type NewTraceStep = typeof traceSteps.$inferInsert;
+export type DiagnosisReport = typeof diagnosisReports.$inferSelect;
+export type NewDiagnosisReport = typeof diagnosisReports.$inferInsert;
 
 // Kept as aliases for callers that used the original generic names.
 export const runs = agentRuns;

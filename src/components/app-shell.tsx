@@ -9,7 +9,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-8">
             <Link href="/" className="group flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500 text-white shadow-lg shadow-violet-500/20"><Command size={16} strokeWidth={2.5} /></span>
-              <span className="hidden text-sm font-semibold tracking-tight text-slate-100 sm:block">AgentPostmortem</span>
+              <span className="hidden text-sm font-semibold tracking-tight text-slate-100 sm:block">TraceWreck</span>
             </Link>
             <nav className="hidden items-center gap-1 md:flex">
               <Link href="/" className="rounded-md bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-slate-100">Runs</Link>

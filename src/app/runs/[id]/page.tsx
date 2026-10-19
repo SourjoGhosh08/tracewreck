@@ -1,24 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Brain, Check, Circle, Cpu, GitBranch, RefreshCw, XCircle } from "lucide-react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowLeft, Brain, Check, Circle, Cpu, GitBranch, Network, RefreshCw, XCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { JsonViewer } from "@/components/json-viewer";
 import { RunStatusBadge } from "@/components/run-status-badge";
+import { RootCauseReport } from "@/components/root-cause-report";
+import { CounterfactualSimulation } from "@/components/counterfactual-simulation";
+import { TraceGraphView } from "@/components/trace-graph-view";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RunRecord, TraceStep } from "@/types/trace";
 import { cn, formatDuration } from "@/lib/utils";
+import { buildTraceGraph } from "@/lib/trace-graph";
 
 const nextPhaseTabs = [
-  { value: "decision-graph", label: "Decision Graph" },
   { value: "root-cause", label: "Root-Cause Report" },
-  { value: "replay", label: "Counterfactual Replay" },
-  { value: "guardrails", label: "Guardrails" }
+  { value: "counterfactual", label: "Counterfactual Simulation" }
 ];
 
 function describeTask(input: unknown) {
@@ -79,22 +81,22 @@ function stepTokens(step: TraceStep) {
   return "Not recorded";
 }
 
-function TimelineStep({ step }: { step: TraceStep }) {
+function TimelineStep({ step, graphNodeId, selected, onViewGraph }: { step: TraceStep; graphNodeId: string | null; selected: boolean; onViewGraph: (nodeId: string) => void }) {
   const tone = toneClasses[stepTone(step)];
   const firstFault = isFirstFault(step);
   const riskScore = step.risk_score ?? step.riskScore;
   const Icon = firstFault || step.status === "error" || step.status === "failed" ? XCircle : step.type === "model_call" || step.type === "agent_plan" ? Brain : step.type === "tool_call" || step.type === "tool_result" ? Cpu : step.type === "final_response" ? Check : Circle;
 
-  return <li className="relative flex gap-3 pb-6 last:pb-0 sm:gap-4">
+  return <li id={graphNodeId ? `timeline-step-${encodeURIComponent(graphNodeId)}` : undefined} className="relative flex gap-3 pb-6 last:pb-0 sm:gap-4">
     <span className={cn("relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border", tone)}><Icon size={15} /></span>
-    <article className={cn("min-w-0 flex-1 rounded-lg border border-white/[0.07] bg-white/[0.015] p-4", (firstFault || step.status === "failed") && "border-red-400/25 bg-red-400/[0.04]")}>
+    <article className={cn("min-w-0 flex-1 rounded-lg border border-white/[0.07] bg-white/[0.015] p-4", selected && "border-violet-300/60 bg-violet-400/[0.06] ring-1 ring-violet-300/40", (firstFault || step.status === "failed") && "border-red-400/25 bg-red-400/[0.04]")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">Title</p>
           <h3 className="text-sm font-medium text-slate-200">{step.name}</h3>
           {step.tool ? <p className="mt-1 break-all font-mono text-[11px] text-orange-300/70">{step.tool}</p> : null}
         </div>
-        {firstFault ? <span className="rounded-md border border-red-400/30 bg-red-400/15 px-2 py-1 text-[10px] font-bold text-red-300">First Faulty Step</span> : null}
+        {firstFault ? <span className="rounded-md border border-red-400/30 bg-red-400/15 px-2 py-1 text-[10px] font-bold text-red-300">Demo fixture annotation</span> : null}
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3 xl:grid-cols-4">
         <div className="col-span-2"><dt className="text-[10px] uppercase tracking-wide text-slate-500">Step ID</dt><dd className="mt-1 break-all font-mono text-slate-400">{step.id}</dd></div>
@@ -106,20 +108,24 @@ function TimelineStep({ step }: { step: TraceStep }) {
         <div><dt className="text-[10px] uppercase tracking-wide text-slate-500">Token usage</dt><dd className="mt-1 font-mono text-slate-400">{stepTokens(step)}</dd></div>
       </dl>
       {step.error ? <div className="mt-4 rounded-md border border-red-400/15 bg-red-400/[0.05] p-3"><div className="flex items-center gap-2 text-xs font-semibold text-red-300"><AlertCircle size={13} /> {step.error.code}</div><p className="mt-1 text-xs leading-5 text-red-200/70">{step.error.message}</p></div> : null}
-      <div className="mt-4 grid gap-3 lg:grid-cols-2"><JsonViewer label="Input JSON" value={step.input ?? null} /><JsonViewer label="Output JSON" value={step.output ?? null} /></div>
+       <div className="mt-4 flex flex-wrap items-center justify-between gap-2"><p className="text-[10px] text-slate-500">Recorded evidence · no causal inference</p>{graphNodeId ? <Button type="button" variant="ghost" size="sm" onClick={() => onViewGraph(graphNodeId)}><GitBranch size={13} /> View in graph</Button> : null}</div>
+       <div className="mt-3 grid gap-3 lg:grid-cols-2"><JsonViewer label="Input JSON" value={step.input ?? null} /><JsonViewer label="Output JSON" value={step.output ?? null} /></div>
     </article>
   </li>;
 }
 
-export default function RunDetailPage({ params }: { params: { id: string } }) {
+export default function RunDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("timeline");
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const loadRun = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/runs/${encodeURIComponent(params.id)}`, { cache: "no-store" });
+      const response = await fetch(`/api/runs/${encodeURIComponent(id)}`, { cache: "no-store" });
       if (!response.ok) throw new Error(response.status === 404 ? "This run does not exist." : "Unable to load this run.");
       const payload = (await response.json()) as { run: RunRecord; steps: TraceStep[] };
       setRun({ ...payload.run, steps: [...payload.steps].sort((left, right) => left.stepIndex - right.stepIndex) });
@@ -128,9 +134,36 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [id]);
 
   useEffect(() => { void loadRun(); }, [loadRun]);
+
+  const graph = useMemo(() => buildTraceGraph(run?.steps ?? [], { inferExecutionOrder: true }), [run?.steps]);
+
+  useEffect(() => {
+    if (activeTab !== "timeline" || !selectedNodeId) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(`timeline-step-${encodeURIComponent(selectedNodeId)}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, selectedNodeId]);
+
+  const graphNodeIdForStep = (step: TraceStep) => {
+    // stepIndex is the normalized occurrence identity. It is intentionally
+    // preferred over the recorded ID because duplicate step IDs are retained
+    // as separate graph nodes.
+    return graph.nodes.find((node) => node.data.step.stepIndex === step.stepIndex)?.id ?? null;
+  };
+
+  const viewInGraph = (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setActiveTab("decision-graph");
+  };
+
+  const viewInTimeline = (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setActiveTab("timeline");
+  };
 
   if (loading) return <AppShell><div className="space-y-6" role="status" aria-label="Loading run"><Skeleton className="h-5 w-24" /><Skeleton className="h-52 w-full" /><Skeleton className="h-9 w-full" /><Skeleton className="h-[420px]" /></div></AppShell>;
   if (error || !run) return <AppShell><EmptyState title="Run unavailable" description={error ?? "This run does not exist."} action={<div className="flex gap-2"><Link href="/" className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 px-3 text-xs text-slate-300"><ArrowLeft size={14} /> Back to runs</Link><Button onClick={() => void loadRun()}><RefreshCw size={14} /> Try again</Button></div>} /></AppShell>;
@@ -152,15 +185,18 @@ export default function RunDetailPage({ params }: { params: { id: string } }) {
         <div><dt className="text-[10px] uppercase tracking-wider text-slate-500">Token usage</dt><dd className="mt-1 font-mono text-sm text-slate-300">{run.totalTokens.toLocaleString()} total</dd><dd className="mt-1 text-[11px] text-slate-500">{run.promptTokens.toLocaleString()} input · {run.completionTokens.toLocaleString()} output</dd></div>
       </dl>
     </Card>
-    <Tabs defaultValue="timeline">
-      <div className="overflow-x-auto pb-1"><TabsList className="min-w-max"><TabsTrigger value="timeline">Timeline</TabsTrigger>{nextPhaseTabs.map((tab) => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}</TabsList></div>
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <div className="overflow-x-auto pb-1"><TabsList className="min-w-max"><TabsTrigger value="timeline">Timeline</TabsTrigger><TabsTrigger value="decision-graph">Decision Graph</TabsTrigger>{nextPhaseTabs.map((tab) => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}</TabsList></div>
       <TabsContent value="timeline" className="mt-5">
         {run.steps.length === 0 ? <EmptyState title="No trace steps" description="This run has no recorded timeline events." /> : <Card>
-           <CardHeader className="border-b border-white/[0.06] pb-4"><CardTitle className="flex items-center gap-2"><GitBranch size={15} className="text-violet-300" /> Timeline</CardTitle><p className="text-xs text-slate-500">{run.steps.length} normalized trace steps · first fault explicitly marked</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500"><span className="text-emerald-300">Green: success</span><span className="text-yellow-300">Yellow: warning</span><span className="text-red-300">Red: error / first fault</span><span className="text-blue-300">Blue: model call</span><span className="text-purple-300">Purple: retrieval</span><span className="text-orange-300">Orange: tool call</span></div></CardHeader>
-          <CardContent className="relative pt-6"><div className="absolute bottom-7 left-[35px] top-7 w-px bg-gradient-to-b from-white/10 via-white/[0.06] to-transparent" /><ol>{run.steps.map((step) => <TimelineStep key={step.id} step={step} />)}</ol></CardContent>
-        </Card>}
+           <CardHeader className="border-b border-white/[0.06] pb-4"><CardTitle className="flex items-center gap-2"><GitBranch size={15} className="text-violet-300" /> Timeline</CardTitle><p className="text-xs text-slate-500">{run.steps.length} normalized trace steps · synthetic fixture annotations are explicitly marked</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500"><span className="text-emerald-300">Green: success</span><span className="text-yellow-300">Yellow: warning</span><span className="text-red-300">Red: error / fixture annotation</span><span className="text-blue-300">Blue: model call</span><span className="text-purple-300">Purple: retrieval</span><span className="text-orange-300">Orange: tool call</span></div></CardHeader>
+           <CardContent className="relative pt-6"><div className="absolute bottom-7 left-[35px] top-7 w-px bg-gradient-to-b from-white/10 via-white/[0.06] to-transparent" /><ol>{run.steps.map((step) => { const graphNodeId = graphNodeIdForStep(step); return <TimelineStep key={`${step.id}-${step.stepIndex}`} step={step} graphNodeId={graphNodeId} selected={graphNodeId === selectedNodeId} onViewGraph={viewInGraph} />; })}</ol></CardContent>
+         </Card>}
       </TabsContent>
-      {nextPhaseTabs.map((tab) => <TabsContent key={tab.value} value={tab.value} className="mt-5"><EmptyState title="Coming in next phase" description={`${tab.label} will be available in the next phase.`} /></TabsContent>)}
+      <TabsContent value="decision-graph" className="mt-5"><Card><CardHeader className="border-b border-white/[0.06] pb-4"><CardTitle className="flex items-center gap-2"><Network size={15} className="text-violet-300" /> Decision Graph</CardTitle><p className="text-xs text-slate-500">{run.steps.length} recorded steps · parent relationships and optional inferred execution order</p></CardHeader><CardContent className="pt-5"><TraceGraphView graph={graph} selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId} onViewTimeline={viewInTimeline} /></CardContent></Card></TabsContent>
+      {nextPhaseTabs.map((tab) => tab.value === "root-cause"
+        ? <TabsContent key={tab.value} value={tab.value} className="mt-5"><RootCauseReport run={run} steps={run.steps} graph={graph} onViewTimeline={viewInTimeline} onViewGraph={viewInGraph} /></TabsContent>
+        : <TabsContent key={tab.value} value={tab.value} className="mt-5"><CounterfactualSimulation run={run} steps={run.steps} graph={graph} onViewTimeline={viewInTimeline} onViewGraph={viewInGraph} /></TabsContent>)}
     </Tabs>
   </div></AppShell>;
 }
