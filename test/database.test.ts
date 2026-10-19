@@ -35,6 +35,7 @@ test("seeds the expected run and trace contract in an isolated database", () => 
 
   assert.equal(seeded.length, 8);
   assert.equal(runs.length, 8);
+  assert.equal(runs.every((run) => run.source === "fixture"), true);
   assert.deepEqual(
     runs.reduce<Record<string, number>>((counts, run) => {
       counts[run.status] = (counts[run.status] ?? 0) + 1;

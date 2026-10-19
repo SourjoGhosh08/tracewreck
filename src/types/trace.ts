@@ -16,6 +16,7 @@ export type TraceEventType =
   | "thought"
   | "output";
 export type AgentRunStatus = "success" | "suspicious" | "failed";
+export type AgentRunSource = "fixture" | "imported";
 
 export interface RunError {
   code: string;
@@ -62,6 +63,7 @@ export interface RunTrace {
   version: 1;
   run_id: string;
   agent: { name: string; version: string };
+  source: AgentRunSource;
   status: AgentRunStatus;
   started_at: string;
   ended_at: string;
@@ -99,6 +101,7 @@ export interface RunListRecord {
   llm_calls: number;
   tool_calls: number;
   created_at: string;
+  source: AgentRunSource;
   step_count: number;
   first_faulty_step: string | null;
   error_code: string | null;

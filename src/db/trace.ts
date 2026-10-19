@@ -76,6 +76,7 @@ export function normalizedRun(run: AgentRun, steps: TraceStep[] = []) {
     llm_calls: run.llmCalls,
     tool_calls: run.toolCalls,
     created_at: run.createdAt,
+    source: run.source,
 
     // Compatibility aliases consumed by the existing page and its types.
     agentName: run.agentName,
@@ -105,6 +106,7 @@ export function traceForRun(run: AgentRun, steps: TraceStep[]) {
     version: 1 as const,
     run_id: run.id,
     agent: { name: run.agentName, version: run.agentVersion },
+    source: run.source,
     status: run.status,
     started_at: run.startedAt,
     ended_at: run.endedAt,

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Brain, Check, Circle, Cpu, GitBranch, Network, RefreshCw, XCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, Brain, Check, Circle, Cpu, GitBranch, Network, RefreshCw, Upload, XCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { JsonViewer } from "@/components/json-viewer";
 import { RunStatusBadge } from "@/components/run-status-badge";
+import { RunSourceBadge } from "@/components/run-source-badge";
 import { RootCauseReport } from "@/components/root-cause-report";
 import { CounterfactualSimulation } from "@/components/counterfactual-simulation";
 import { TraceGraphView } from "@/components/trace-graph-view";
@@ -173,7 +174,7 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
     <Card className="overflow-hidden">
       <div className="border-b border-white/[0.07] bg-gradient-to-r from-violet-500/[0.08] via-transparent to-transparent p-6 sm:p-7">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-          <div className="min-w-0"><p className="mb-2 text-[10px] uppercase tracking-[0.15em] text-slate-500">Agent name</p><h1 className="text-2xl font-semibold tracking-tight text-slate-100">{run.agentName}</h1><p className="mt-1 break-all font-mono text-[11px] text-slate-500">{run.id}</p></div>
+           <div className="min-w-0"><div className="mb-2 flex flex-wrap items-center gap-2"><p className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Agent name</p><RunSourceBadge source={run.source} /></div><h1 className="text-2xl font-semibold tracking-tight text-slate-100">{run.agentName}</h1><p className="mt-1 break-all font-mono text-[11px] text-slate-500">{run.id}</p></div>
           <div><p className="mb-2 text-[10px] uppercase tracking-[0.15em] text-slate-500">Status</p><RunStatusBadge status={run.status} /></div>
         </div>
         <div className="mt-5"><p className="text-[10px] uppercase tracking-wider text-slate-500">Task</p><p className="mt-1 text-sm leading-6 text-slate-300">{describeTask(run.input)}</p></div>
@@ -184,7 +185,8 @@ export default function RunDetailPage({ params }: { params: Promise<{ id: string
         <div><dt className="text-[10px] uppercase tracking-wider text-slate-500">Duration</dt><dd className="mt-1 font-mono text-sm text-slate-300">{formatDuration(run.durationMs)}</dd></div>
         <div><dt className="text-[10px] uppercase tracking-wider text-slate-500">Token usage</dt><dd className="mt-1 font-mono text-sm text-slate-300">{run.totalTokens.toLocaleString()} total</dd><dd className="mt-1 text-[11px] text-slate-500">{run.promptTokens.toLocaleString()} input · {run.completionTokens.toLocaleString()} output</dd></div>
       </dl>
-    </Card>
+     </Card>
+     {run.source === "imported" ? <div role="status" className="flex items-start gap-3 rounded-lg border border-sky-400/20 bg-sky-400/[0.05] p-4 text-xs text-sky-100/80"><Upload size={15} className="mt-0.5 shrink-0 text-sky-300" aria-hidden="true" /><div><p className="font-semibold text-sky-200">Imported trace</p><p className="mt-1 leading-5">This workspace is showing recorded evidence from the imported payload. Demo fixture annotations are not applied, and diagnosis only runs when you explicitly start it.</p></div></div> : null}
     <Tabs value={activeTab} onValueChange={setActiveTab}>
       <div className="overflow-x-auto pb-1"><TabsList className="min-w-max"><TabsTrigger value="timeline">Timeline</TabsTrigger><TabsTrigger value="decision-graph">Decision Graph</TabsTrigger>{nextPhaseTabs.map((tab) => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}</TabsList></div>
       <TabsContent value="timeline" className="mt-5">

@@ -3,6 +3,9 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 export const runStatuses = ["success", "suspicious", "failed"] as const;
 export type RunStatus = (typeof runStatuses)[number];
 
+export const runSources = ["fixture", "imported"] as const;
+export type RunSource = (typeof runSources)[number];
+
 export const traceStepTypes = [
   "user_request",
   "agent_plan",
@@ -39,7 +42,8 @@ export const agentRuns = sqliteTable("agent_runs", {
   totalTokensOut: integer("total_tokens_out").notNull(),
   llmCalls: integer("llm_calls").notNull(),
   toolCalls: integer("tool_calls").notNull(),
-  createdAt: text("created_at").notNull()
+  createdAt: text("created_at").notNull(),
+  source: text("source", { enum: runSources }).notNull().default("fixture")
 });
 
 /** One normalized execution step. JSON payloads are stored as SQLite TEXT. */

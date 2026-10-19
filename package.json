@@ -11,7 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "test": "node --import tsx --test test/database.test.ts test/trace-graph.test.ts test/diagnosis-backend.test.ts test/counterfactual-simulation.test.ts"
+    "test": "node --import tsx --test test/database.test.ts test/run-import.test.ts test/tracewreck-sdk.test.ts test/trace-graph.test.ts test/diagnosis-backend.test.ts test/counterfactual-simulation.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.2",

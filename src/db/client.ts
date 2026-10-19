@@ -58,7 +58,8 @@ function createDb(): Db {
       total_tokens_out INTEGER NOT NULL,
       llm_calls INTEGER NOT NULL,
       tool_calls INTEGER NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'fixture' CHECK (source IN ('fixture', 'imported'))
     );
     CREATE TABLE IF NOT EXISTS trace_steps (
       id TEXT PRIMARY KEY NOT NULL,
@@ -78,7 +79,7 @@ function createDb(): Db {
       risk_score REAL,
       notes TEXT,
       is_first_faulty_step INTEGER NOT NULL DEFAULT 0 CHECK (is_first_faulty_step IN (0, 1)),
-       UNIQUE (run_id, step_id)
+      UNIQUE (run_id, step_id)
     );
     CREATE TABLE IF NOT EXISTS diagnosis_reports (
       id TEXT PRIMARY KEY NOT NULL,
@@ -119,6 +120,10 @@ function createDb(): Db {
   ];
   for (const [column, definition] of additions) {
     if (!existingColumns.has(column)) sqlite.exec(`ALTER TABLE diagnosis_reports ADD COLUMN ${column} ${definition}`);
+  }
+  const runColumns = sqlite.prepare("PRAGMA table_info(agent_runs)").all() as Array<{ name: string }>;
+  if (!new Set(runColumns.map((column) => column.name)).has("source")) {
+    sqlite.exec("ALTER TABLE agent_runs ADD COLUMN source TEXT NOT NULL DEFAULT 'fixture'");
   }
   return drizzle(sqlite, { schema });
 }

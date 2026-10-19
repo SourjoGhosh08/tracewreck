@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, ArrowRight, Bug, CheckCircle2, Clock3, RefreshCw, Search, Terminal } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Bug, CheckCircle2, Clock3, RefreshCw, Search, Terminal, Upload } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { MetricCard } from "@/components/metric-card";
 import { RunStatusBadge } from "@/components/run-status-badge";
+import { RunSourceBadge } from "@/components/run-source-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -101,6 +102,8 @@ export default function DashboardPage() {
 
   const failedRuns = runs.filter((run) => run.status === "failed").length;
   const suspiciousRuns = runs.filter((run) => run.status === "suspicious").length;
+  const importedRuns = runs.filter((run) => run.source === "imported").length;
+  const fixtureRuns = runs.length - importedRuns;
   const averageSteps = runs.length ? runs.reduce((total, run) => total + run.stepCount, 0) / runs.length : 0;
 
   return <AppShell>
@@ -111,7 +114,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-slate-100 sm:text-4xl">TraceWreck</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-500">The flight recorder and root-cause debugger for AI agents.</p>
         </div>
-        <Button variant="secondary" onClick={() => void loadRuns()} disabled={loading}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh data</Button>
+         <div className="flex flex-wrap items-center gap-2"><Link href="/app/import" className="inline-flex h-9 items-center gap-2 rounded-md border border-violet-400/25 bg-violet-400/10 px-3.5 py-2 text-sm font-medium text-violet-200 transition-colors hover:bg-violet-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"><Upload size={14} aria-hidden="true" /> Import run</Link><Button variant="secondary" onClick={() => void loadRuns()} disabled={loading}><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh data</Button></div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -135,9 +138,10 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-1 rounded-lg border border-white/[0.08] bg-slate-950/60 p-1.5" role="group" aria-label="Status filter">
           {(["all", "success", "suspicious", "failed"] as StatusFilter[]).map((value) => <button type="button" key={value} onClick={() => setStatus(value)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${status === value ? "bg-white/[0.09] text-slate-100" : "text-slate-500 hover:text-slate-300"}`}>{value === "all" ? "All" : value.charAt(0).toUpperCase() + value.slice(1)}</button>)}
-        </div>
+         </div>
+         <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-600"><span className="mr-1 uppercase tracking-[0.12em]">Run source</span><span className="inline-flex items-center gap-1.5"><RunSourceBadge source="fixture" /><span>{fixtureRuns}</span></span><span className="inline-flex items-center gap-1.5"><RunSourceBadge source="imported" /><span>{importedRuns}</span></span></div>
 
-        {error ? <EmptyState title="Could not load runs" description={error} action={<Button onClick={() => void loadRuns()}><RefreshCw size={14} /> Try again</Button>} /> : loading ? <Card className="overflow-hidden"><div className="space-y-px">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="flex items-center gap-4 border-b border-white/[0.05] p-4"><Skeleton className="h-4 w-44" /><Skeleton className="h-4 w-36" /><Skeleton className="ml-auto h-4 w-20" /><Skeleton className="h-4 w-24" /></div>)}</div></Card> : filteredRuns.length === 0 ? <EmptyState title={runs.length ? "No matching runs" : "No runs yet"} description={runs.length ? "Try adjusting the status or field filters." : "Seed the database to start inspecting agent executions."} action={!runs.length ? <Button variant="secondary" onClick={() => void loadRuns()}><RefreshCw size={14} /> Reload data</Button> : undefined} /> : <Card className="overflow-hidden">
+         {error ? <EmptyState title="Could not load runs" description={error} action={<Button onClick={() => void loadRuns()}><RefreshCw size={14} /> Try again</Button>} /> : loading ? <Card className="overflow-hidden"><div className="space-y-px">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="flex items-center gap-4 border-b border-white/[0.05] p-4"><Skeleton className="h-4 w-44" /><Skeleton className="h-4 w-36" /><Skeleton className="ml-auto h-4 w-20" /><Skeleton className="h-4 w-24" /></div>)}</div></Card> : filteredRuns.length === 0 ? <EmptyState title={runs.length ? "No matching runs" : "No runs yet"} description={runs.length ? "Try adjusting the status or field filters." : "Seed the database to start inspecting agent executions."} action={!runs.length ? <Button variant="secondary" onClick={() => void loadRuns()}><RefreshCw size={14} /> Reload data</Button> : undefined} /> : <Card className="overflow-hidden">
           <div className="overflow-x-auto"><table className="w-full min-w-[1320px] text-left"><thead className="border-b border-white/[0.07] bg-white/[0.02]"><tr className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600"><th className="px-5 py-3.5">Run ID</th><th className="px-4 py-3.5">Agent name</th><th className="px-4 py-3.5">Task summary</th><th className="px-4 py-3.5">Status</th><th className="px-4 py-3.5">LLM calls</th><th className="px-4 py-3.5">Tool calls</th><th className="px-4 py-3.5">Duration</th><th className="px-4 py-3.5">Failure class</th><th className="px-4 py-3.5">Created at</th><th className="px-5 py-3.5 text-right">View</th></tr></thead><tbody>{filteredRuns.map((run) => { const counts = callCounts(run); const highlighted = run.status === "failed" && run.agentName.toLowerCase().includes("supportrefund"); return <tr key={run.id} className={`group border-b border-white/[0.05] last:border-0 hover:bg-white/[0.025] ${highlighted ? "bg-red-500/[0.045] shadow-[inset_3px_0_0_rgba(248,113,113,0.75)]" : ""}`}><td className="px-5 py-4"><Link href={`/runs/${run.id}`} className="font-mono text-xs text-slate-300 transition-colors hover:text-violet-300">{run.id}</Link>{highlighted ? <span className="mt-1 inline-flex items-center gap-1 rounded bg-red-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-300"><AlertTriangle size={10} /> highlighted fault</span> : null}</td><td className="px-4 py-4"><p className="text-xs font-medium text-slate-300">{run.agentName}</p><p className="mt-1 font-mono text-[10px] text-slate-600">v{run.agentVersion}</p></td><td className="max-w-[270px] px-4 py-4"><p className="truncate text-xs text-slate-400" title={run.taskSummary ?? "No task summary recorded"}>{run.taskSummary ?? "No task summary recorded"}</p></td><td className="px-4 py-4"><RunStatusBadge status={run.status} /></td><td className="px-4 py-4 font-mono text-xs text-slate-400">{run.steps ? counts.llm : "—"}</td><td className="px-4 py-4 font-mono text-xs text-slate-400">{run.steps ? counts.tools : "—"}</td><td className="px-4 py-4 font-mono text-xs text-slate-400">{formatDuration(run.durationMs)}</td><td className="px-4 py-4 text-xs text-slate-500">{formatFailureClass(run.failureClass)}</td><td className="px-4 py-4 text-xs text-slate-500" title={formatDate(run.createdAt)}>{formatRelativeDate(run.createdAt)}</td><td className="px-5 py-4 text-right"><Link href={`/runs/${run.id}`} aria-label={`View ${run.id}`} className="inline-flex rounded p-1.5 text-slate-600 transition-colors hover:bg-white/[0.07] hover:text-violet-300"><ArrowRight size={15} /></Link></td></tr>; })}</tbody></table></div>
           <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3 text-[11px] text-slate-600"><span>Showing {filteredRuns.length} of {runs.length} runs</span><span className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-400" /> Live data</span></div>
         </Card>}

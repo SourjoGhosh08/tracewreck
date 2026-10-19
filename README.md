@@ -16,6 +16,7 @@ Implemented:
 - Eight deterministic synthetic fixtures: four successful, two suspicious, and two failed runs.
 - A detailed failed `SupportRefund Agent` damaged-headphones scenario.
 - Dashboard filters, run metrics, run table, run detail header, and timeline JSON inspection.
+- Bring-your-own-trace import at `/app/import`, transactional `POST /api/runs` ingestion, source labels, and a dependency-free TypeScript client in `sdk/tracewreck.ts`.
 - `GET /api/runs`, `GET /api/runs/:id`, and explicit reset/reseed `POST /api/seed`.
 - Phase 2 Decision Graph for recorded execution steps, evidence inspection, relationship warnings, downstream highlighting, and Timeline/Graph navigation.
 - Phase 3 evidence-linked diagnosis with a runtime-validated report contract, additive SQLite storage, cache identity, bounded provider requests, one correction attempt, and sanitized provider errors.
@@ -35,8 +36,8 @@ The `is_first_faulty_step` values are fixture annotations. They are not live mod
 ```text
 Browser
   └─ Next.js App Router UI
-       ├─ Dashboard and /runs/[id] timeline
-       └─ Route handlers: /api/runs, /api/runs/:id, /api/runs/:id/diagnosis
+        ├─ Landing page, /app dashboard, /app/import intake, and /runs/[id] timeline
+        └─ Route handlers: /api/runs, /api/runs/:id, /api/runs/:id/diagnosis
             └─ Drizzle ORM
                  └─ better-sqlite3 → SQLite file in ./data
 ```
@@ -130,7 +131,55 @@ API endpoints:
 - `POST /api/runs/:id/diagnosis/start` — load the trace by route run ID on the server and request a diagnosis. An optional JSON body `{ "regenerate": true }` explicitly bypasses a matching completed cache entry and makes another provider request. Client-supplied trace contents are ignored.
 - `POST /api/runs/:id/diagnosis` — compatibility alias for the same start action.
 - `POST /api/seed` — explicitly reset and reload all eight demo fixtures only when `ALLOW_DEMO_RESET=true`; otherwise it returns `403`.
-- `POST /api/runs` — unsupported; run listing is read-only. The old convenience reset behavior was removed to prevent accidental data loss.
+- `POST /api/runs` — import one normalized JSON run and its steps transactionally. Imported runs are marked with `source: "imported"`; fixture annotations are not applied. Invalid input returns `400` with field-level details.
+
+## Bring your own agent trace
+
+The seeded runs are only demonstrations. To inspect a real test run, open `/app/import` and upload or paste a normalized JSON trace. The server validates the complete payload, stores the run and all steps atomically, labels it **Imported trace**, and opens the same Timeline, Decision Graph, diagnosis, and counterfactual screens used by the fixtures.
+
+Imported traces never receive `is_first_faulty_step` fixture annotations automatically. A diagnosis is only requested when the user explicitly starts it, and its result remains an evidence-linked hypothesis rather than proof of causality.
+
+### Agent integration client
+
+`sdk/tracewreck.ts` is a dependency-free TypeScript client that can be copied into a Node or TypeScript agent. It records normalized steps in memory and submits one completed run to `POST /api/runs`:
+
+```ts
+import { TraceWreckClient } from "./sdk/tracewreck";
+
+const tracewreck = new TraceWreckClient({
+  endpoint: process.env.TRACEWRECK_URL ?? "http://localhost:3000",
+  apiKey: process.env.TRACEWRECK_API_KEY
+});
+
+const run = tracewreck.startRun({
+  agent_name: "Support Agent",
+  agent_version: "1.0.0",
+  model: "your-model",
+  task_summary: "Handle a support request",
+  user_request: { message: "..." }
+});
+
+run.recordStep({
+  step_id: "request",
+  type: "user_request",
+  title: "Receive user request",
+  started_at: new Date().toISOString(),
+  ended_at: new Date().toISOString(),
+  input: { message: "..." },
+  output: { accepted: true },
+  status: "ok"
+});
+
+await run.finish({
+  status: "failed",
+  final_outcome: { ok: false, message: "The action failed" },
+  failure_class: "tool_error"
+});
+```
+
+The complete runnable example is in `examples/tracewreck-agent.ts`. It uses the local development server by default. When `TRACEWRECK_INGEST_TOKEN` is configured, send the matching value as `TRACEWRECK_API_KEY`; the client places it in an `Authorization: Bearer ...` header. The browser import page also has an optional token field.
+
+For production use, authentication, project isolation, rate limiting, sensitive-data review, and durable multi-tenant storage still require deployment work. Do not send secrets or unredacted personal data in trace inputs.
 
 ## Test and checks
 
@@ -140,7 +189,7 @@ The one required offline test command is:
 npm test
 ```
 
-It uses temporary SQLite databases, cleans them up, and asserts the eight-run/status contract, valid run and parent references, safe additive diagnosis storage, ordered detail retrieval, cache identity, redaction and fixture-label exclusion, duplicate-reference handling, malformed provider responses, bounded correction behavior, missing configuration, and explicit demo/live separation. It never resets `data/agentpostmortem.db` and makes no network calls.
+It uses temporary SQLite databases, cleans them up, and asserts the eight-run/status contract, imported trace validation and rollback behavior, source labeling and fixture-marker exclusion, valid run and parent references, safe additive diagnosis storage, ordered detail retrieval, cache identity, redaction and fixture-label exclusion, duplicate-reference handling, malformed provider responses, bounded correction behavior, missing configuration, and explicit demo/live separation. It never resets `data/agentpostmortem.db` and makes no network calls.
 
 Additional checks:
 
